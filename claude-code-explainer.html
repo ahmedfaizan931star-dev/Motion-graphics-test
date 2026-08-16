@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Claude Code — Motion Explainer</title>
+<style>
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: local('JetBrains Mono');
+  }
+
+  :root{
+    --charcoal: #1A1815;
+    --charcoal-deep: #121110;
+    --cream: #F4F1EA;
+    --orange: #D97757;
+    --orange-dim: #B8593F;
+    --green: #6B9E78;
+    --red: #C1666B;
+    --grey: #8A8579;
+    --grey-dim: #55524A;
+    --line: rgba(244,241,234,0.09);
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html,body{
+    width:1920px;
+    height:1080px;
+    background:var(--charcoal);
+    overflow:hidden;
+    font-family:'Inter','Helvetica Neue',-apple-system,sans-serif;
+  }
+
+  #stage{
+    position:relative;
+    width:1920px;
+    height:1080px;
+    background:var(--charcoal);
+  }
+
+  .mono{
+    font-family:'JetBrains Mono','SF Mono','Consolas',monospace;
+  }
+
+  /* ============ SCENE FRAMEWORK ============ */
+  .scene{
+    position:absolute;
+    inset:0;
+    opacity:0;
+    pointer-events:none;
+  }
+
+  /* subtle grain/vignette for texture, applied globally */
+  #vignette{
+    position:absolute; inset:0;
+    background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 100%);
+    z-index:500;
+    pointer-events:none;
+  }
+
+  #grain{
+    position:absolute; inset:0;
+    z-index:501;
+    opacity:0.035;
+    pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* right-third reserved zone guide (invisible in final render, toggle with .show-guides) */
+  .guide{
+    position:absolute; top:0; bottom:0; left:1280px; width:640px;
+    border-left:2px dashed rgba(217,119,87,0.5);
+    z-index:999;
+    display:none;
+  }
+  .show-guides .guide{ display:block; }
+
+  /* ============ TERMINAL WINDOW (signature element) ============ */
+  .term-window{
+    position:absolute;
+    background:var(--charcoal-deep);
+    border-radius:12px;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.55), 0 0 0 1px rgba(244,241,234,0.06);
+    overflow:hidden;
+  }
+  .term-chrome{
+    height:44px;
+    background:linear-gradient(180deg, #232019, #1c1a15);
+    display:flex;
+    align-items:center;
+    padding:0 20px;
+    gap:8px;
+    border-bottom:1px solid rgba(244,241,234,0.06);
+  }
+  .term-dot{ width:12px; height:12px; border-radius:50%; }
+  .term-chrome .term-label{
+    margin-left:16px;
+    color:var(--grey);
+    font-size:14px;
+    letter-spacing:0.02em;
+  }
+  .term-body{
+    padding:32px 36px;
+    color:var(--cream);
+    font-size:22px;
+    line-height:1.75;
+  }
+  .prompt-sym{ color:var(--orange); }
+  .caret{
+    display:inline-block;
+    width:11px; height:26px;
+    background:var(--orange);
+    vertical-align:-5px;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  /* ============ TYPE STYLES ============ */
+  .display{
+    font-weight:800;
+    letter-spacing:-0.02em;
+    color:var(--cream);
+    line-height:1.05;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    color:var(--orange);
+    font-size:20px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    font-weight:600;
+  }
+  .sub{
+    color:var(--grey);
+    font-weight:400;
+    line-height:1.5;
+  }
+
+  /* ============ ICON MORPH ROW (surfaces scene) ============ */
+  .surf-row{
+    display:flex;
+    gap:64px;
+  }
+  .surf-card{
+    width:220px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:22px;
+    opacity:0;
+    transform:translateY(40px);
+  }
+  .surf-icon{
+    width:120px; height:120px;
+    border-radius:24px;
+    background:var(--charcoal-deep);
+    border:1.5px solid rgba(244,241,234,0.1);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .surf-label{
+    font-family:'JetBrains Mono',monospace;
+    color:var(--grey);
+    font-size:18px;
+    letter-spacing:0.04em;
+  }
+
+  /* ============ FILE TREE ============ */
+  .filetree{
+    font-family:'JetBrains Mono',monospace;
+    font-size:20px;
+    color:var(--grey);
+    line-height:2.15;
+  }
+  .filetree .row{ opacity:0; transform:translateX(-14px); white-space:pre; }
+  .filetree .active{ color:var(--cream); }
+  .filetree .scan-hit{
+    background:rgba(217,119,87,0.16);
+    color:var(--orange);
+    border-radius:4px;
+    padding:2px 6px;
+    margin:0 -6px;
+  }
+
+  /* ============ DIFF BLOCK ============ */
+  .diffline{
+    font-family:'JetBrains Mono',monospace;
+    font-size:19px;
+    line-height:1.9;
+    white-space:pre;
+    opacity:0;
+  }
+  .diff-add{ color:var(--green); }
+  .diff-add::before{ content:'+ '; opacity:0.6; }
+  .diff-rem{ color:var(--red); }
+  .diff-rem::before{ content:'– '; opacity:0.6; }
+  .diff-ctx{ color:var(--grey-dim); }
+  .diff-ctx::before{ content:'  '; }
+
+  /* ============ CONNECTOR LINES (MCP scene) ============ */
+  svg.connectors line{
+    stroke:var(--grey-dim);
+    stroke-width:2;
+    stroke-dasharray:6 6;
+  }
+  svg.connectors .flow{
+    stroke:var(--orange);
+    stroke-width:2.5;
+    stroke-dasharray:8 500;
+    animation: dash 2.2s linear infinite;
+  }
+  @keyframes dash{ to{ stroke-dashoffset:-500; } }
+
+  /* ============ MISC ============ */
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:16px;
+    color:var(--charcoal);
+    background:var(--orange);
+    padding:8px 18px;
+    border-radius:100px;
+    font-weight:600;
+    letter-spacing:0.02em;
+  }
+
+  .big-cursor-block{
+    width:1920px; height:1080px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- ======================================================= -->
+  <!-- SCENE 1 · 0:00–0:06 · HOOK — full bleed, no talking head -->
+  <!-- ======================================================= -->
+  <section class="scene" id="s1">
+    <div class="big-cursor-block">
+      <div class="mono" style="font-size:64px; color:var(--cream); display:flex; align-items:center;">
+        <span class="prompt-sym" id="s1-prompt" style="opacity:0; margin-right:24px;">&gt;</span>
+        <span id="s1-typed"></span><span class="caret" id="s1-caret" style="opacity:0;"></span>
+      </div>
+    </div>
+    <div style="position:absolute; bottom:120px; width:1920px; text-align:center; opacity:0;" id="s1-tag">
+      <span class="eyebrow">An agentic coding tool</span>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- SCENE 2 · 0:06–0:15 · DEFINITION — right third reserved  -->
+  <!-- ======================================================= -->
+  <section class="scene" id="s2">
+    <div class="guide"></div>
+    <div style="position:absolute; left:140px; top:150px; width:1000px;">
+      <div class="eyebrow" style="opacity:0;" id="s2-eyebrow">CLAUDE CODE</div>
+      <div class="display" style="font-size:76px; margin-top:22px; opacity:0; transform:translateY(24px);" id="s2-headline">
+        Reads your codebase.<br>Edits files. Runs commands.
+      </div>
+    </div>
+
+    <div class="term-window" style="left:140px; top:460px; width:1000px; opacity:0; transform:translateY(30px);" id="s2-term">
+      <div class="term-chrome">
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-label mono">terminal — zsh</div>
+      </div>
+      <div class="term-body mono" style="font-size:20px;">
+        <span class="prompt-sym">&gt;</span> claude<br>
+        <span style="color:var(--grey);">Ready. Ask for a feature, a fix, or a refactor.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- SCENE 3 · 0:15–0:26 · READS CODEBASE — full bleed        -->
+  <!-- ======================================================= -->
+  <section class="scene" id="s3">
+    <div style="position:absolute; left:140px; top:110px;">
+      <div class="eyebrow" style="opacity:0;" id="s3-eyebrow">UNDERSTANDS THE WHOLE PROJECT</div>
+    </div>
+
+    <div class="term-window" style="left:140px; top:200px; width:1180px; height:760px; opacity:0;" id="s3-term">
+      <div class="term-chrome">
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-label mono">my-app/</div>
+      </div>
+      <div class="term-body">
+        <div class="filetree" id="s3-tree">
+          <div class="row">src/</div>
+          <div class="row">&nbsp;&nbsp;components/</div>
+          <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;<span class="scan-hit">Checkout.tsx</span></div>
+          <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;Cart.tsx</div>
+          <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;Nav.tsx</div>
+          <div class="row">&nbsp;&nbsp;lib/</div>
+          <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;<span class="scan-hit">payments.ts</span></div>
+          <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;auth.ts</div>
+          <div class="row">&nbsp;&nbsp;api/</div>
+          <div class="row">&nbsp;&nbsp;&nbsp;&nbsp;<span class="scan-hit">routes.ts</span></div>
+          <div class="row">&nbsp;&nbsp;tests/</div>
+          <div class="row">package.json</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="position:absolute; right:150px; top:420px; width:520px; opacity:0;" id="s3-note">
+      <div class="sub" style="font-size:26px;">No manual context-pasting.<br>It finds what's relevant on its own.</div>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- SCENE 4 · 0:26–0:38 · EDITS + RUNS — right third reserved-->
+  <!-- ======================================================= -->
+  <section class="scene" id="s4">
+    <div class="guide"></div>
+    <div style="position:absolute; left:140px; top:110px;">
+      <div class="eyebrow" style="opacity:0;" id="s4-eyebrow">EDITS CODE. RUNS COMMANDS.</div>
+    </div>
+
+    <div class="term-window" style="left:140px; top:200px; width:1080px; height:340px; opacity:0;" id="s4-term1">
+      <div class="term-chrome">
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-label mono">payments.ts — diff</div>
+      </div>
+      <div class="term-body" style="padding:26px 36px;">
+        <div class="diffline diff-ctx" id="d1">function chargeCard(amount) {</div>
+        <div class="diffline diff-rem" id="d2">&nbsp;&nbsp;if (amount &gt; 0) return process(amount);</div>
+        <div class="diffline diff-add" id="d3">&nbsp;&nbsp;if (amount &lt;= 0) throw new Error('Invalid amount');</div>
+        <div class="diffline diff-add" id="d4">&nbsp;&nbsp;return process(amount);</div>
+        <div class="diffline diff-ctx" id="d5">}</div>
+      </div>
+    </div>
+
+    <div class="term-window" style="left:140px; top:600px; width:1080px; height:250px; opacity:0;" id="s4-term2">
+      <div class="term-chrome">
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-label mono">terminal</div>
+      </div>
+      <div class="term-body mono" style="font-size:19px; padding:24px 36px;">
+        <span class="prompt-sym">&gt;</span> npm test<span id="s4-cmd-caret" class="caret"></span>
+        <div id="s4-testresult" style="opacity:0; margin-top:14px; color:var(--green);">✓ 14 passed &nbsp;·&nbsp; 0 failed</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- SCENE 5 · 0:38–0:50 · MULTI-SURFACE — full bleed          -->
+  <!-- ======================================================= -->
+  <section class="scene" id="s5">
+    <div style="position:absolute; top:150px; width:1920px; text-align:center;">
+      <div class="eyebrow" style="opacity:0;" id="s5-eyebrow">ONE TOOL. EVERY SURFACE.</div>
+    </div>
+    <div style="position:absolute; top:400px; width:1920px; display:flex; justify-content:center;">
+      <div class="surf-row" id="s5-row">
+        <div class="surf-card">
+          <div class="surf-icon">
+            <svg width="56" height="56" viewBox="0 0 56 56"><rect x="4" y="8" width="48" height="36" rx="4" fill="none" stroke="#D97757" stroke-width="2.5"/><path d="M12 22l8 6-8 6" stroke="#D97757" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="26" y1="34" x2="38" y2="34" stroke="#D97757" stroke-width="2.5" stroke-linecap="round"/></svg>
+          </div>
+          <div class="surf-label">Terminal</div>
+        </div>
+        <div class="surf-card">
+          <div class="surf-icon">
+            <svg width="56" height="56" viewBox="0 0 56 56"><rect x="4" y="6" width="48" height="44" rx="4" fill="none" stroke="#D97757" stroke-width="2.5"/><line x1="4" y1="18" x2="52" y2="18" stroke="#D97757" stroke-width="2.5"/><line x1="16" y1="6" x2="16" y2="18" stroke="#D97757" stroke-width="2.5"/><line x1="22" y1="28" x2="40" y2="28" stroke="#D97757" stroke-width="2" opacity="0.6"/><line x1="22" y1="36" x2="34" y2="36" stroke="#D97757" stroke-width="2" opacity="0.6"/></svg>
+          </div>
+          <div class="surf-label">IDE</div>
+        </div>
+        <div class="surf-card">
+          <div class="surf-icon">
+            <svg width="56" height="56" viewBox="0 0 56 56"><rect x="10" y="4" width="36" height="44" rx="5" fill="none" stroke="#D97757" stroke-width="2.5"/><line x1="10" y1="40" x2="46" y2="40" stroke="#D97757" stroke-width="2.5"/><circle cx="28" cy="44.5" r="1.8" fill="#D97757"/></svg>
+          </div>
+          <div class="surf-label">Desktop</div>
+        </div>
+        <div class="surf-card">
+          <div class="surf-icon">
+            <svg width="56" height="56" viewBox="0 0 56 56"><rect x="4" y="8" width="48" height="40" rx="4" fill="none" stroke="#D97757" stroke-width="2.5"/><line x1="4" y1="18" x2="52" y2="18" stroke="#D97757" stroke-width="2.5"/><circle cx="11" cy="13" r="1.6" fill="#D97757"/><circle cx="17" cy="13" r="1.6" fill="#D97757"/></svg>
+          </div>
+          <div class="surf-label">Browser</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- SCENE 6 · 0:50–1:00 · MCP INTEGRATIONS — top third reserved -->
+  <!-- ======================================================= -->
+  <section class="scene" id="s6">
+    <div style="position:absolute; top:0; left:0; width:1920px; height:360px; border-bottom:2px dashed rgba(217,119,87,0.35); display:none;" class="guide-top"></div>
+
+    <div style="position:absolute; top:430px; width:1920px; text-align:center;">
+      <div class="eyebrow" style="opacity:0;" id="s6-eyebrow">CONNECTS TO YOUR TOOLS VIA MCP</div>
+    </div>
+
+    <svg class="connectors" width="1920" height="1080" style="position:absolute; inset:0;">
+      <line id="l1" x1="960" y1="620" x2="620" y2="820"/>
+      <line id="l2" x1="960" y1="620" x2="960" y2="850"/>
+      <line id="l3" x1="960" y1="620" x2="1300" y2="820"/>
+      <line class="flow" id="f1" x1="960" y1="620" x2="620" y2="820" style="opacity:0;"/>
+      <line class="flow" id="f2" x1="960" y1="620" x2="960" y2="850" style="opacity:0;"/>
+      <line class="flow" id="f3" x1="960" y1="620" x2="1300" y2="820" style="opacity:0;"/>
+    </svg>
+
+    <div class="term-window" style="left:790px; top:520px; width:340px; opacity:0;" id="s6-term">
+      <div class="term-chrome" style="height:34px; padding:0 14px;">
+        <div class="term-dot" style="width:9px;height:9px;background:#5f5b52;"></div>
+        <div class="term-dot" style="width:9px;height:9px;background:#5f5b52;"></div>
+        <div class="term-dot" style="width:9px;height:9px;background:#5f5b52;"></div>
+      </div>
+      <div class="term-body mono" style="padding:16px 20px; font-size:15px;">
+        <span class="prompt-sym">&gt;</span> claude<span class="caret" style="height:16px; width:8px;"></span>
+      </div>
+    </div>
+
+    <div class="surf-card" style="position:absolute; left:460px; top:800px; opacity:0; transform:none;" id="s6-icon1">
+      <div class="surf-icon" style="width:100px; height:100px;">
+        <svg width="46" height="46" viewBox="0 0 46 46"><rect x="4" y="4" width="38" height="38" rx="9" fill="none" stroke="#8A8579" stroke-width="2.5"/><path d="M16 23h14M23 16v14" stroke="#8A8579" stroke-width="2.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="surf-label" style="font-size:16px;">Slack</div>
+    </div>
+    <div class="surf-card" style="position:absolute; left:800px; top:830px; opacity:0; transform:none;" id="s6-icon2">
+      <div class="surf-icon" style="width:100px; height:100px;">
+        <svg width="46" height="46" viewBox="0 0 46 46"><rect x="7" y="4" width="32" height="38" rx="3" fill="none" stroke="#8A8579" stroke-width="2.5"/><line x1="14" y1="14" x2="32" y2="14" stroke="#8A8579" stroke-width="2"/><line x1="14" y1="21" x2="32" y2="21" stroke="#8A8579" stroke-width="2"/><line x1="14" y1="28" x2="26" y2="28" stroke="#8A8579" stroke-width="2"/></svg>
+      </div>
+      <div class="surf-label" style="font-size:16px;">Jira</div>
+    </div>
+    <div class="surf-card" style="position:absolute; left:1140px; top:800px; opacity:0; transform:none;" id="s6-icon3">
+      <div class="surf-icon" style="width:100px; height:100px;">
+        <svg width="46" height="46" viewBox="0 0 46 46"><path d="M23 4l19 33H4z" fill="none" stroke="#8A8579" stroke-width="2.5" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="surf-label" style="font-size:16px;">Drive</div>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- SCENE 7 · 1:00–1:05 · CTA — full bleed                    -->
+  <!-- ======================================================= -->
+  <section class="scene" id="s7">
+    <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:36px;">
+      <div style="display:flex; align-items:center; gap:22px; opacity:0; transform:translateY(20px);" id="s7-mark">
+        <svg width="64" height="64" viewBox="0 0 64 64"><rect x="4" y="4" width="56" height="56" rx="14" fill="#D97757"/><path d="M20 32h10M20 24h18M20 40h14" stroke="#1A1815" stroke-width="4" stroke-linecap="round"/></svg>
+        <div class="display" style="font-size:56px;">Claude Code</div>
+      </div>
+      <div class="term-window mono" style="opacity:0; transform:translateY(20px); padding:0;" id="s7-install">
+        <div class="term-body" style="padding:20px 34px; font-size:24px;">
+          <span class="prompt-sym">&gt;</span> npm install -g @anthropic-ai/claude-code
+        </div>
+      </div>
+      <div class="sub" style="font-size:24px; opacity:0;" id="s7-tag">claude.com/code</div>
+    </div>
+  </section>
+
+  <div id="vignette"></div>
+  <div id="grain"></div>
+</div>
+
+<script>
+/* ============================================================
+   TIMELINE ENGINE
+   Total duration: 65s. All timings in ms from video start.
+   Uses Web Animations API for precision + easy MP4 capture via
+   frame-stepping (see CAPTURE NOTES at bottom).
+============================================================ */
+
+const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
+const EASE_IN = 'cubic-bezier(0.7, 0, 0.84, 0)';
+
+function fadeUp(el, {delay=0, dur=700, y=24, ease=EASE} = {}){
+  return el.animate(
+    [
+      { opacity:0, transform:`translateY(${y}px)` },
+      { opacity:1, transform:'translateY(0px)' }
+    ],
+    { delay, duration:dur, easing:ease, fill:'forwards' }
+  );
+}
+function fadeIn(el, {delay=0, dur=600, ease=EASE} = {}){
+  return el.animate(
+    [{opacity:0},{opacity:1}],
+    { delay, duration:dur, easing:ease, fill:'forwards' }
+  );
+}
+function fadeOut(el, {delay=0, dur=500} = {}){
+  return el.animate(
+    [{opacity:1},{opacity:0}],
+    { delay, duration:dur, easing:EASE_IN, fill:'forwards' }
+  );
+}
+
+function sceneIn(id, delay=0, dur=500){
+  const el = document.getElementById(id);
+  el.animate([{opacity:0},{opacity:1}], {delay, duration:dur, fill:'forwards'});
+}
+function sceneOut(id, delay=0, dur=500){
+  const el = document.getElementById(id);
+  el.animate([{opacity:1},{opacity:0}], {delay, duration:dur, fill:'forwards'});
+}
+
+function typeText(el, text, {delay=0, speed=55} = {}){
+  let i = 0;
+  el.style.opacity = 1;
+  const timer = setInterval(() => {
+    el.textContent = text.slice(0, i);
+    i++;
+    if (i > text.length) clearInterval(timer);
+  }, speed);
+  // schedule start
+  el.textContent = '';
+  setTimeout(() => {
+    i = 0;
+    const t2 = setInterval(() => {
+      el.textContent = text.slice(0, i);
+      i++;
+      if (i > text.length) clearInterval(t2);
+    }, speed);
+  }, delay);
+}
+
+/* ---------------- SCENE 1 : 0.0s – 6.0s ---------------- */
+sceneIn('s1', 0, 1);
+(function(){
+  const prompt = document.getElementById('s1-prompt');
+  const typed = document.getElementById('s1-typed');
+  const caret = document.getElementById('s1-caret');
+  fadeIn(prompt, {delay:300, dur:300});
+  caret.style.opacity = 1;
+  typeText(typed, 'claude', {delay:600, speed:90});
+  fadeUp(document.getElementById('s1-tag'), {delay:2600, dur:700});
+  sceneOut('s1', 5400, 500);
+})();
+
+/* ---------------- SCENE 2 : 6.0s – 15.0s ---------------- */
+sceneIn('s2', 5900, 500);
+(function(){
+  fadeUp(document.getElementById('s2-eyebrow'), {delay:6300, dur:600});
+  fadeUp(document.getElementById('s2-headline'), {delay:6550, dur:800});
+  fadeUp(document.getElementById('s2-term'), {delay:7200, dur:800, y:30});
+  sceneOut('s2', 14400, 500);
+})();
+
+/* ---------------- SCENE 3 : 15.0s – 26.0s ---------------- */
+sceneIn('s3', 14900, 500);
+(function(){
+  fadeUp(document.getElementById('s3-eyebrow'), {delay:15200, dur:600});
+  fadeIn(document.getElementById('s3-term'), {delay:15400, dur:600});
+  const rows = document.querySelectorAll('#s3-tree .row');
+  rows.forEach((r,i) => {
+    fadeUp(r, {delay:15900 + i*160, dur:450, y:14});
+  });
+  fadeUp(document.getElementById('s3-note'), {delay:15900 + rows.length*160 + 300, dur:700});
+  sceneOut('s3', 25400, 500);
+})();
+
+/* ---------------- SCENE 4 : 26.0s – 38.0s ---------------- */
+sceneIn('s4', 25900, 500);
+(function(){
+  fadeUp(document.getElementById('s4-eyebrow'), {delay:26200, dur:600});
+  fadeUp(document.getElementById('s4-term1'), {delay:26400, dur:700, y:30});
+  ['d1','d2','d3','d4','d5'].forEach((id,i) => {
+    fadeIn(document.getElementById(id), {delay:27200 + i*260, dur:350});
+  });
+  fadeUp(document.getElementById('s4-term2'), {delay:29400, dur:700, y:30});
+  fadeIn(document.getElementById('s4-testresult'), {delay:31200, dur:400});
+  sceneOut('s4', 37400, 500);
+})();
+
+/* ---------------- SCENE 5 : 38.0s – 50.0s ---------------- */
+sceneIn('s5', 37900, 500);
+(function(){
+  fadeUp(document.getElementById('s5-eyebrow'), {delay:38200, dur:600});
+  const cards = document.querySelectorAll('#s5-row .surf-card');
+  cards.forEach((c,i) => {
+    fadeUp(c, {delay:38700 + i*220, dur:600, y:40});
+  });
+  sceneOut('s5', 49400, 500);
+})();
+
+/* ---------------- SCENE 6 : 50.0s – 60.0s ---------------- */
+sceneIn('s6', 49900, 500);
+(function(){
+  fadeUp(document.getElementById('s6-term'), {delay:50200, dur:600, y:20});
+  fadeUp(document.getElementById('s6-eyebrow'), {delay:50500, dur:600});
+  ['s6-icon1','s6-icon2','s6-icon3'].forEach((id,i) => {
+    fadeUp(document.getElementById(id), {delay:50900 + i*200, dur:600, y:30});
+  });
+  ['l1','l2','l3'].forEach((id,i) => {
+    fadeIn(document.getElementById(id), {delay:51600 + i*150, dur:400});
+  });
+  ['f1','f2','f3'].forEach((id,i) => {
+    document.getElementById(id).style.opacity = 1;
+  });
+  sceneOut('s6', 59400, 500);
+})();
+
+/* ---------------- SCENE 7 : 60.0s – 65.0s ---------------- */
+sceneIn('s7', 59900, 500);
+(function(){
+  fadeUp(document.getElementById('s7-mark'), {delay:60200, dur:700});
+  fadeUp(document.getElementById('s7-install'), {delay:60800, dur:700});
+  fadeIn(document.getElementById('s7-tag'), {delay:61600, dur:600});
+})();
+
+</script>
+</body>
+</html>

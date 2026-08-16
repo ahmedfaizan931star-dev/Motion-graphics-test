@@ -1,0 +1,40 @@
+name: Render motion graphics to MP4
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "capture.mjs"
+  workflow_dispatch: {}
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright + ffmpeg
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg
+
+      - name: Render frames + stitch MP4
+        run: node capture.mjs
+
+      - name: Upload MP4 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-code-explainer-mp4
+          path: output.mp4
+          retention-days: 30

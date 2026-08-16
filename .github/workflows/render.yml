@@ -38,3 +38,14 @@ jobs:
           name: claude-code-explainer-mp4
           path: output.mp4
           retention-days: 30
+
+      # Only runs if the render step above failed — gives you the partial
+      # frame sequence + full log context to diagnose without needing
+      # local reproduction. Safe to ignore if the render succeeded.
+      - name: Upload debug frames on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-frames
+          path: frames/
+          retention-days: 7

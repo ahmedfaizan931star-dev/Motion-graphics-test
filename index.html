@@ -39,6 +39,36 @@
     background:var(--charcoal);
   }
 
+  /* ambient background glow — keeps the reserved talking-head zones from
+     reading as dead space, without competing with foreground content */
+  #ambient{
+    position:absolute; inset:0;
+    z-index:0;
+    background:
+      radial-gradient(680px 680px at 82% 22%, rgba(217,119,87,0.10), transparent 60%),
+      radial-gradient(900px 900px at 15% 85%, rgba(107,158,120,0.05), transparent 60%);
+    animation: ambientDrift 18s ease-in-out infinite alternate;
+  }
+  @keyframes ambientDrift{
+    0%{ transform:translate(0,0) scale(1); }
+    100%{ transform:translate(-2%,1.5%) scale(1.04); }
+  }
+
+  #stage > .scene, #stage > #vignette, #stage > #grain{ z-index:1; }
+
+  #progress-track{
+    position:absolute; left:0; right:0; bottom:0;
+    height:3px;
+    background:rgba(244,241,234,0.06);
+    z-index:600;
+  }
+  #progress-fill{
+    height:100%;
+    width:0%;
+    background:var(--orange);
+    box-shadow: 0 0 8px rgba(217,119,87,0.7);
+  }
+
   .mono{
     font-family:'JetBrains Mono','SF Mono','Consolas',monospace;
   }
@@ -80,20 +110,24 @@
   .term-window{
     position:absolute;
     background:var(--charcoal-deep);
-    border-radius:12px;
-    box-shadow: 0 40px 100px rgba(0,0,0,0.55), 0 0 0 1px rgba(244,241,234,0.06);
+    border-radius:14px;
+    box-shadow:
+      0 50px 120px rgba(0,0,0,0.6),
+      0 12px 32px rgba(0,0,0,0.35),
+      0 0 0 1px rgba(244,241,234,0.07),
+      inset 0 1px 0 rgba(244,241,234,0.05);
     overflow:hidden;
   }
   .term-chrome{
     height:44px;
-    background:linear-gradient(180deg, #232019, #1c1a15);
+    background:linear-gradient(180deg, #262319, #1c1a15);
     display:flex;
     align-items:center;
     padding:0 20px;
     gap:8px;
     border-bottom:1px solid rgba(244,241,234,0.06);
   }
-  .term-dot{ width:12px; height:12px; border-radius:50%; }
+  .term-dot{ width:12px; height:12px; border-radius:50%; box-shadow: inset 0 -1px 1px rgba(0,0,0,0.25), 0 0 0 0.5px rgba(0,0,0,0.3); }
   .term-chrome .term-label{
     margin-left:16px;
     color:var(--grey);
@@ -190,9 +224,9 @@
     white-space:pre;
     opacity:0;
   }
-  .diff-add{ color:var(--green); }
+  .diff-add{ color:var(--green); background:linear-gradient(90deg, rgba(107,158,120,0.14), transparent 85%); margin:0 -36px; padding-left:36px; padding-right:36px; }
   .diff-add::before{ content:'+ '; opacity:0.6; }
-  .diff-rem{ color:var(--red); }
+  .diff-rem{ color:var(--red); background:linear-gradient(90deg, rgba(193,102,107,0.14), transparent 85%); margin:0 -36px; padding-left:36px; padding-right:36px; }
   .diff-rem::before{ content:'– '; opacity:0.6; }
   .diff-ctx{ color:var(--grey-dim); }
   .diff-ctx::before{ content:'  '; }
@@ -208,8 +242,22 @@
     stroke-width:2.5;
     stroke-dasharray:8 500;
     animation: dash 2.2s linear infinite;
+    filter: drop-shadow(0 0 4px rgba(217,119,87,0.6));
   }
   @keyframes dash{ to{ stroke-dashoffset:-500; } }
+
+  svg.connectors .pulse-dot{
+    fill:var(--orange);
+    filter: drop-shadow(0 0 6px rgba(217,119,87,0.85));
+    offset-rotate: 0deg;
+    animation: travel 1.8s ease-in-out infinite;
+  }
+  @keyframes travel{
+    0%{ offset-distance:0%; opacity:0; }
+    12%{ opacity:1; }
+    88%{ opacity:1; }
+    100%{ offset-distance:100%; opacity:0; }
+  }
 
   /* ============ MISC ============ */
   .pill{
@@ -235,6 +283,7 @@
 </head>
 <body>
 <div id="stage">
+  <div id="ambient"></div>
 
   <!-- ======================================================= -->
   <!-- SCENE 1 · 0:00–0:06 · HOOK — full bleed, no talking head -->
@@ -265,9 +314,9 @@
 
     <div class="term-window" style="left:140px; top:460px; width:1000px; opacity:0; transform:translateY(30px);" id="s2-term">
       <div class="term-chrome">
-        <div class="term-dot" style="background:#5f5b52;"></div>
-        <div class="term-dot" style="background:#5f5b52;"></div>
-        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#EC6A5E;"></div>
+        <div class="term-dot" style="background:#F4BF4F;"></div>
+        <div class="term-dot" style="background:#61C554;"></div>
         <div class="term-label mono">terminal — zsh</div>
       </div>
       <div class="term-body mono" style="font-size:20px;">
@@ -287,9 +336,9 @@
 
     <div class="term-window" style="left:140px; top:200px; width:1180px; height:760px; opacity:0;" id="s3-term">
       <div class="term-chrome">
-        <div class="term-dot" style="background:#5f5b52;"></div>
-        <div class="term-dot" style="background:#5f5b52;"></div>
-        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#EC6A5E;"></div>
+        <div class="term-dot" style="background:#F4BF4F;"></div>
+        <div class="term-dot" style="background:#61C554;"></div>
         <div class="term-label mono">my-app/</div>
       </div>
       <div class="term-body">
@@ -326,9 +375,9 @@
 
     <div class="term-window" style="left:140px; top:200px; width:1080px; height:340px; opacity:0;" id="s4-term1">
       <div class="term-chrome">
-        <div class="term-dot" style="background:#5f5b52;"></div>
-        <div class="term-dot" style="background:#5f5b52;"></div>
-        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#EC6A5E;"></div>
+        <div class="term-dot" style="background:#F4BF4F;"></div>
+        <div class="term-dot" style="background:#61C554;"></div>
         <div class="term-label mono">payments.ts — diff</div>
       </div>
       <div class="term-body" style="padding:26px 36px;">
@@ -342,9 +391,9 @@
 
     <div class="term-window" style="left:140px; top:600px; width:1080px; height:250px; opacity:0;" id="s4-term2">
       <div class="term-chrome">
-        <div class="term-dot" style="background:#5f5b52;"></div>
-        <div class="term-dot" style="background:#5f5b52;"></div>
-        <div class="term-dot" style="background:#5f5b52;"></div>
+        <div class="term-dot" style="background:#EC6A5E;"></div>
+        <div class="term-dot" style="background:#F4BF4F;"></div>
+        <div class="term-dot" style="background:#61C554;"></div>
         <div class="term-label mono">terminal</div>
       </div>
       <div class="term-body mono" style="font-size:19px; padding:24px 36px;">
@@ -408,13 +457,16 @@
       <line class="flow" id="f1" x1="960" y1="620" x2="620" y2="820" style="opacity:0;"/>
       <line class="flow" id="f2" x1="960" y1="620" x2="960" y2="850" style="opacity:0;"/>
       <line class="flow" id="f3" x1="960" y1="620" x2="1300" y2="820" style="opacity:0;"/>
+      <circle class="pulse-dot" id="p1" r="4" cx="960" cy="620" style="opacity:0; offset-path: path('M960,620 L620,820');"/>
+      <circle class="pulse-dot" id="p2" r="4" cx="960" cy="620" style="opacity:0; offset-path: path('M960,620 L960,850');"/>
+      <circle class="pulse-dot" id="p3" r="4" cx="960" cy="620" style="opacity:0; offset-path: path('M960,620 L1300,820');"/>
     </svg>
 
     <div class="term-window" style="left:790px; top:520px; width:340px; opacity:0;" id="s6-term">
       <div class="term-chrome" style="height:34px; padding:0 14px;">
-        <div class="term-dot" style="width:9px;height:9px;background:#5f5b52;"></div>
-        <div class="term-dot" style="width:9px;height:9px;background:#5f5b52;"></div>
-        <div class="term-dot" style="width:9px;height:9px;background:#5f5b52;"></div>
+        <div class="term-dot" style="width:9px;height:9px;background:#EC6A5E;"></div>
+        <div class="term-dot" style="width:9px;height:9px;background:#F4BF4F;"></div>
+        <div class="term-dot" style="width:9px;height:9px;background:#61C554;"></div>
       </div>
       <div class="term-body mono" style="padding:16px 20px; font-size:15px;">
         <span class="prompt-sym">&gt;</span> claude<span class="caret" style="height:16px; width:8px;"></span>
@@ -461,6 +513,7 @@
 
   <div id="vignette"></div>
   <div id="grain"></div>
+  <div id="progress-track"><div id="progress-fill"></div></div>
 </div>
 
 <script>
@@ -496,34 +549,47 @@ function fadeOut(el, {delay=0, dur=500} = {}){
   );
 }
 
-function sceneIn(id, delay=0, dur=500){
+function sceneIn(id, delay=0, dur=650){
   const el = document.getElementById(id);
-  el.animate([{opacity:0},{opacity:1}], {delay, duration:dur, fill:'forwards'});
+  el.animate(
+    [
+      { opacity:0, transform:'scale(1.015)', filter:'blur(6px)' },
+      { opacity:1, transform:'scale(1)', filter:'blur(0px)' }
+    ],
+    { delay, duration:dur, easing:EASE, fill:'forwards' }
+  );
 }
-function sceneOut(id, delay=0, dur=500){
+function sceneOut(id, delay=0, dur=550){
   const el = document.getElementById(id);
-  el.animate([{opacity:1},{opacity:0}], {delay, duration:dur, fill:'forwards'});
+  el.animate(
+    [
+      { opacity:1, transform:'scale(1)', filter:'blur(0px)' },
+      { opacity:0, transform:'scale(0.985)', filter:'blur(6px)' }
+    ],
+    { delay, duration:dur, easing:EASE_IN, fill:'forwards' }
+  );
 }
 
 function typeText(el, text, {delay=0, speed=55} = {}){
-  let i = 0;
   el.style.opacity = 1;
-  const timer = setInterval(() => {
+  el.textContent = '';
+  let i = 0;
+  function step(){
     el.textContent = text.slice(0, i);
     i++;
-    if (i > text.length) clearInterval(timer);
-  }, speed);
-  // schedule start
-  el.textContent = '';
-  setTimeout(() => {
-    i = 0;
-    const t2 = setInterval(() => {
-      el.textContent = text.slice(0, i);
-      i++;
-      if (i > text.length) clearInterval(t2);
-    }, speed);
-  }, delay);
+    if (i > text.length) return;
+    // slight natural jitter so keystrokes don't feel metronomic
+    const jitter = speed + (Math.random() * 40 - 20);
+    setTimeout(step, Math.max(30, jitter));
+  }
+  setTimeout(step, delay);
 }
+
+/* ---------------- PROGRESS BAR : full duration ---------------- */
+document.getElementById('progress-fill').animate(
+  [{width:'0%'},{width:'100%'}],
+  {duration:65000, easing:'linear', fill:'forwards'}
+);
 
 /* ---------------- SCENE 1 : 0.0s – 6.0s ---------------- */
 sceneIn('s1', 0, 1);
@@ -597,6 +663,11 @@ sceneIn('s6', 49900, 500);
   });
   ['f1','f2','f3'].forEach((id,i) => {
     document.getElementById(id).style.opacity = 1;
+  });
+  ['p1','p2','p3'].forEach((id,i) => {
+    const dot = document.getElementById(id);
+    dot.style.opacity = 1;
+    dot.style.animationDelay = `${i*0.35}s`;
   });
   sceneOut('s6', 59400, 500);
 })();
